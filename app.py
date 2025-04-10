@@ -214,7 +214,7 @@ if not st.session_state.chat_finished:
                         ]
                         client = Groq(api_key="GROQ_API_KEY")
                         response = client.chat.completions.create(
-                            model=modelo_final,
+                            model=modelo_groq,
                             messages=chat_history
                         )
                         return response.choices[0].message.content
@@ -258,7 +258,7 @@ if not st.session_state.chat_finished:
                             ]
                             client = Groq(api_key="GROQ_API_KEY")
                             response = client.chat.completions.create(
-                                model=modelo_final,
+                                model=modelo_groq,
                                 messages=chat_history
                             )
                             return response.choices[0].message.content
