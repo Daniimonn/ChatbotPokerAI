@@ -53,31 +53,21 @@ if st.sidebar.button("🛠 Soporte Técnico"):
 # Selección de modelo y configuración
 st.sidebar.markdown("---")
 st.sidebar.title("Configuración del Modelo")
-model_source = st.sidebar.radio(
-    "Elige el modelo a usar:",
-    ("Modelos en la Nube - Groq", "Modelo Local - llama3.2")
-)
-if model_source == "Modelos en la Nube - Groq":
-    modelo_groq = st.sidebar.radio(
-        "Selecciona el modelo Groq:",
-        ("llama-3.3-70b-versatile", "gemma2-9b-it"),
-        index=0
-    )
-    modelo_final = modelo_groq
-else:
-    modelo_final = "llama3.2"
 
-# Instanciar el modelo
-if model_source == "Modelo Local - llama3.2":
-    from langchain_ollama import OllamaLLM
-    llm = OllamaLLM(model=modelo_final, temperature=0.7, top_p=0.9, max_tokens=150)
-else:
-    llm = LLM(
-        model=f"groq/{modelo_final}",
-        temperature=0.5,
-        base_url="https://api.groq.com/openai/v1",
-        api_key=os.getenv("GROQ_API_KEY")
-    )
+# Solo mostrar opciones de Groq
+modelo_groq = st.sidebar.radio(
+    "Selecciona el modelo Groq:",
+    ("llama-3.3-70b-versatile", "gemma2-9b-it"),
+    index=0
+)
+
+# Instanciar el modelo Groq
+llm = LLM(
+    model=f"groq/{modelo_groq}",
+    temperature=0.5,
+    base_url="https://api.groq.com/openai/v1",
+    api_key=os.getenv("GROQ_API_KEY")
+)
 
 # Crear agentes
 coach_poker = Agent(
@@ -131,7 +121,7 @@ chatbot_system_message = SystemMessage(
     content="Eres un asistente experto en reglas del póker. Responde de forma clara, profesional y concisa solo a preguntas que tengan que ver con las reglas y a palabras técnicas. Añade siempre al final que escribiendo 'Salir' se puede finalizar el chat."
 )
 
-# Variables de estado
+# Variables de estado de sesión
 if "messages" not in st.session_state:
     st.session_state.messages = [chatbot_system_message]
 if "message_agents" not in st.session_state:
@@ -144,8 +134,11 @@ if "agente_seleccionado" not in st.session_state:
     st.session_state.agente_seleccionado = None
 if "first_interaction" not in st.session_state:
     st.session_state.first_interaction = False
+if "agent_selected_from_main" not in st.session_state:
+    st.session_state.agent_selected_from_main = False
 if "ultimo_agente" not in st.session_state:
     st.session_state.ultimo_agente = None
+
 
 st.markdown("<h1 style='text-align: center;'>👋 Hola, soy PokerStars AI</h1>", unsafe_allow_html=True)
 st.markdown("<h5 style='text-align: center;'>¿En qué puedo ayudarte hoy?</h5>", unsafe_allow_html=True)
@@ -154,56 +147,128 @@ st.markdown("<h5 style='text-align: center;'>¿En qué puedo ayudarte hoy?</h5>"
 for i, message in enumerate(st.session_state.messages):
     if i == 0:
         continue
-    with st.chat_message("user" if isinstance(message, HumanMessage) else "assistant"):
-        nombre = "Tú" if isinstance(message, HumanMessage) else st.session_state.message_agents[i]
-        st.markdown(f"**{nombre}**")
-        st.markdown(message.content)
+    if isinstance(message, HumanMessage):
+        with st.chat_message("user"):
+            st.markdown("**Tú**")
+            st.markdown(message.content)
+    elif isinstance(message, AIMessage):
+        with st.chat_message("assistant"):
+            agent_name = st.session_state.message_agents[i]
+            st.markdown(f"**{agent_name}**")
+            st.markdown(message.content)
+
+# Mostrar aviso de agente activo
+if st.session_state.agente_seleccionado != st.session_state.ultimo_agente:
+    if st.session_state.agente_seleccionado:
+        st.info(f"Estás conversando con el agente: **{st.session_state.agente_seleccionado}**")
+    else:
+        st.info("Estás hablando con el asistente de PokerStars.")
+    st.session_state.ultimo_agente = st.session_state.agente_seleccionado
 
 # Entrada del usuario
 if not st.session_state.chat_finished:
-    prompt = st.chat_input("Escribe tu mensaje...")
-    if prompt:
-        st.session_state.first_interaction = True
-        if prompt.strip().lower() == "salir":
-            st.session_state.feedback_pending = True
-        else:
-            st.session_state.messages.append(HumanMessage(content=prompt))
-            st.session_state.message_agents.append(None)
+    if not st.session_state.first_interaction and len(st.session_state.messages) == 1:
+        st.write("")
+        col1, col2, col3 = st.columns([1, 6, 1])
+        with col2:
+            prompt = st.chat_input("Escribe tu mensaje...")
+            st.write("")
+            st.markdown("<h6 style='text-align: center;'>O elige a un agente dedicado:</h6>", unsafe_allow_html=True)
+            st.write("")
+            cols = st.columns(4)
+            with cols[0]:
+                if st.button("🧠 Coach", use_container_width=True):
+                    st.session_state.agente_seleccionado = "Coach Poker"
+                    st.session_state.first_interaction = True
+                    st.session_state.agent_selected_from_main = True
+                    st.rerun()
+            with cols[1]:
+                if st.button("🃏 Evaluar", use_container_width=True):
+                    st.session_state.agente_seleccionado = "Evaluador Mano"
+                    st.session_state.first_interaction = True
+                    st.session_state.agent_selected_from_main = True
+                    st.rerun()
+            with cols[2]:
+                if st.button("🎲 Simular", use_container_width=True):
+                    st.session_state.agente_seleccionado = "Simulador Jugada"
+                    st.session_state.first_interaction = True
+                    st.session_state.agent_selected_from_main = True
+                    st.rerun()
+            with cols[3]:
+                if st.button("🛠 Soporte", use_container_width=True):
+                    st.session_state.agente_seleccionado = "Soporte Técnico"
+                    st.session_state.first_interaction = True
+                    st.session_state.agent_selected_from_main = True
+                    st.rerun()
 
-            with st.spinner("Pensando..."):
-                if st.session_state.agente_seleccionado:
-                    task = Task(
-                        description=prompt,
-                        expected_output="Respuesta clara y útil para el usuario.",
-                        agent=agentes[st.session_state.agente_seleccionado]
-                    )
-                    crew = Crew(
-                        agents=[agentes[st.session_state.agente_seleccionado]],
-                        tasks=[task],
-                        verbose=False
-                    )
-                    result = crew.kickoff()
-                    response_text = result.output if hasattr(result, "output") else str(result)
-                    agente_nombre = st.session_state.agente_seleccionado
-                else:
+            if prompt:
+                st.session_state.first_interaction = True
+                st.session_state.messages.append(HumanMessage(content=prompt))
+                st.session_state.message_agents.append(None)
+
+                with st.spinner("Pensando..."):
                     def groq_invoke(messages):
                         chat_history = [{"role": "system", "content": messages[0].content}] + [
                             {"role": "user" if isinstance(m, HumanMessage) else "assistant", "content": m.content}
                             for m in messages[1:]
                         ]
-                        client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+                        client = Groq(api_key="GROQ_API_KEY")
                         response = client.chat.completions.create(
                             model=modelo_final,
                             messages=chat_history
                         )
                         return response.choices[0].message.content
-
                     response_text = groq_invoke(st.session_state.messages)
-                    agente_nombre = "Asistente PokerStars"
 
-            st.session_state.messages.append(AIMessage(content=response_text))
-            st.session_state.message_agents.append(agente_nombre)
-            st.rerun()
+                agente_nombre = st.session_state.agente_seleccionado if st.session_state.agente_seleccionado else "Asistente PokerStars"
+                st.session_state.messages.append(AIMessage(content=response_text))
+                st.session_state.message_agents.append(agente_nombre)
+                st.rerun()
+    else:
+        prompt = st.chat_input("Escribe tu mensaje...")
+
+        if prompt:
+            st.session_state.first_interaction = True
+            if prompt.strip().lower() == "salir":
+                st.session_state.feedback_pending = True
+            else:
+                st.session_state.messages.append(HumanMessage(content=prompt))
+                st.session_state.message_agents.append(None)
+
+                with st.spinner("Pensando..."):
+                    if st.session_state.agente_seleccionado:
+                        task = Task(
+                            description=prompt,
+                            expected_output="Respuesta clara y útil para el usuario.",
+                            agent=agentes[st.session_state.agente_seleccionado]
+                        )
+                        crew = Crew(
+                            agents=[agentes[st.session_state.agente_seleccionado]],
+                            tasks=[task],
+                            verbose=False
+                        )
+                        result = crew.kickoff()
+                        result_text = result.output if hasattr(result, "output") else str(result)
+                        agente_nombre = st.session_state.agente_seleccionado
+                    else:
+                        def groq_invoke(messages):
+                            chat_history = [{"role": "system", "content": messages[0].content}] + [
+                                {"role": "user" if isinstance(m, HumanMessage) else "assistant", "content": m.content}
+                                for m in messages[1:]
+                            ]
+                            client = Groq(api_key="GROQ_API_KEY")
+                            response = client.chat.completions.create(
+                                model=modelo_final,
+                                messages=chat_history
+                            )
+                            return response.choices[0].message.content
+                        response_text = groq_invoke(st.session_state.messages)
+                        result_text = response_text
+                        agente_nombre = "Asistente PokerStars"
+
+                st.session_state.messages.append(AIMessage(content=result_text))
+                st.session_state.message_agents.append(agente_nombre)
+                st.rerun()
 
 # Feedback
 if st.session_state.feedback_pending:
