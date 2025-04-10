@@ -5,3 +5,4 @@ crewai
 groq
 gspread
 oauth2client
+chromadb>=0.4.15
