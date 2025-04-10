@@ -212,7 +212,7 @@ if not st.session_state.chat_finished:
                             {"role": "user" if isinstance(m, HumanMessage) else "assistant", "content": m.content}
                             for m in messages[1:]
                         ]
-                        client = Groq(api_key="GROQ_API_KEY")
+                        client = Groq(api_key=st.secrets["GROQ_API_KEY"])
                         response = client.chat.completions.create(
                             model=modelo_groq,
                             messages=chat_history
@@ -256,7 +256,7 @@ if not st.session_state.chat_finished:
                                 {"role": "user" if isinstance(m, HumanMessage) else "assistant", "content": m.content}
                                 for m in messages[1:]
                             ]
-                            client = Groq(api_key="GROQ_API_KEY")
+                            client = Groq(api_key=st.secrets["GROQ_API_KEY"])
                             response = client.chat.completions.create(
                                 model=modelo_groq,
                                 messages=chat_history
